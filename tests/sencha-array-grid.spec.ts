@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, FrameLocator } from '@playwright/test';
 
 test.describe('Sencha ExtJS Kitchen Sink - Array Grid', () => {
-  let frame;
+  let frame: FrameLocator;
   
   test.beforeEach(async ({ page }) => {
     // Navigăm la pagina specificată
