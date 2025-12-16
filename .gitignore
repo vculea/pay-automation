@@ -6,6 +6,11 @@ test-results/
 playwright-report/
 playwright/.auth/
 
+# TypeScript
+dist/
+build/
+*.tsbuildinfo
+
 # Environment variables
 .env
 .env.local
