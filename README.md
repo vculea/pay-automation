@@ -1,33 +1,64 @@
-# Pay Automation MCP Server
+# Pay Automation
 
-Model Context Protocol (MCP) Server that provides Playwright automation tools for payment site testing, specifically optimized for Sencha ExtJS applications.
+Automated testing project using Playwright, specifically optimized for testing Sencha ExtJS applications.
 
 ## Features
 
-- **Browser Management**: Launch and control browser instances
-- **Page Navigation**: Create pages and navigate to URLs  
-- **Frame Switching**: Handle iframe contexts seamlessly
-- **Element Interactions**: Click, fill, wait for elements
-- **Automated Testing**: Built-in Sencha ExtJS test suite
+- **Automated Testing**: Playwright test suite for Sencha ExtJS Kitchen Sink
+- **Cross-browser Testing**: Chrome, Firefox, Safari support
 - **TypeScript**: Full type safety and modern development
+- **Clean Architecture**: Minimal, focused codebase
 
 ## Installation
 
 ```bash
 npm install
-npm run build
 ```
 
 ## Usage
 
-### As MCP Server
+### Run Tests
 
-Add to your MCP client configuration:
+```bash
+# Run all tests
+npm test
 
-```json
-{
-  "mcpServers": {
-    "pay-automation": {
+# Run tests in headed mode (visible browser)
+npm run test:headed
+
+# Run tests with UI mode
+npm run test:ui
+
+# Debug tests
+npm run test:debug
+```
+
+### Test Structure
+
+The project contains automated tests for Sencha ExtJS Kitchen Sink Array Grid component:
+
+- Page load verification
+- Grid component visibility
+- Grid headers validation  
+- Row interaction testing
+- Navigation menu testing
+- Responsive design testing
+
+## Configuration
+
+- `playwright.config.ts` - Playwright configuration
+- `tests/` - Test files directory
+- `tsconfig.json` - TypeScript configuration
+
+## Browser Support
+
+- Chromium (Chrome/Edge)
+- Firefox  
+- WebKit (Safari)
+
+## License
+
+ISC
       "command": "node",
       "args": ["path/to/pay-automation/build/index.js"]
     }

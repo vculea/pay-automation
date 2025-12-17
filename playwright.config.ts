@@ -22,13 +22,19 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    launchOptions: {
+      args: ["--start-maximized"],
+    },
   },
 
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        //  ...devices['Desktop Chrome'],
+        viewport: null,
+       },
     },
 
     {
@@ -57,8 +63,8 @@ export default defineConfig({
     //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
     // },
     // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+      // name: 'Google Chrome',
+      // use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     // },
   ],
 

@@ -17,6 +17,7 @@ playwright/.auth/
 .env
 .env.local
 .env.*.local
+configs.ts
 
 # IDE
 .vscode/
