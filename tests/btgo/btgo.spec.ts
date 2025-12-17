@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { credentials } from './configs';
-import { LoginPage } from './views/btgo/login';
-import { ViewPage } from './views/btgo/view';
+import { credentials } from '../configs';
+import { LoginPage } from '../../views/btgo/login';
+import { ViewPage } from '../../views/btgo/view';
 
     test('BTGo Move all values from current cont to cont economii', async ({ page }) => {
         const loginPage = new LoginPage(page);

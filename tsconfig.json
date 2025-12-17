@@ -13,5 +13,5 @@
   "include": [
     "tests/**/*",
     "playwright.config.ts"
-  ]
+, "views/btgo/login.ts", "views/btgo/view.ts"  ]
 }
