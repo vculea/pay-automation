@@ -6,7 +6,7 @@ import { ViewPage } from './views/btgo/view';
     test('BTGo Move all values from current cont to cont economii', async ({ page }) => {
         const loginPage = new LoginPage(page);
         await loginPage.goto();
-        await loginPage.login(credentials.btgo_id, credentials.btgo_password);
+        await loginPage.login(credentials.btgoId, credentials.btgoPassword);
 
         console.log("Waiting for approval...");
 
