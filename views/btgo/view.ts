@@ -65,7 +65,6 @@ export class ViewPage {
         await this.page.locator('#reportTypeSwitch').filter({ hasText: 'CSV' }).click();
 
         await this.page.click('#selectAccountBtn');
-        // const child = this.page.getByText(cont);
         await this.page.locator('.item').filter({ hasText: cont }).click();
 
         await this.page.click('#generateReportsBtn');
