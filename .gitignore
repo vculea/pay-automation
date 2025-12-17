@@ -1,14 +1,16 @@
 # Dependencies
 node_modules/
 
+# Build output
+build/
+dist/
+
 # Playwright
 test-results/
 playwright-report/
 playwright/.auth/
 
 # TypeScript
-dist/
-build/
 *.tsbuildinfo
 
 # Environment variables

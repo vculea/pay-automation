@@ -1,19 +1,25 @@
 {
   "name": "pay-automation",
   "version": "1.0.0",
-  "description": "Pay automatically for different sites",
-  "main": "index.js",
+  "description": "Automated testing using Playwright",
+  "type": "module",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug"
   },
-  "keywords": ["automation", "payment", "testing"],
+  "keywords": [
+    "playwright",
+    "automation",
+    "testing"
+  ],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "@playwright/test": "^1.40.0"
+  },
   "devDependencies": {
-    "@playwright/test": "^1.40.0",
     "typescript": "^5.3.0"
   }
 }
