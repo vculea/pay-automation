@@ -18,6 +18,7 @@ playwright/.auth/
 downloads/
 
 configs.ts
+credentials.json
 
 # IDE
 .vscode/
