@@ -5,15 +5,20 @@ import * as path from 'path';
 
 export class GoogleSheetsService {
     private sheets: any;
+    private drive: any;
     private auth: GoogleAuth | any;
 
     constructor() {
         this.auth = null;
         this.sheets = null;
+        this.drive = null;
     }
 
     async authenticate() {
-        const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+        const SCOPES = [
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive'
+        ];
         const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
 
         if (!fs.existsSync(CREDENTIALS_PATH)) {
@@ -48,6 +53,7 @@ export class GoogleSheetsService {
         }
 
         this.sheets = google.sheets({ version: 'v4', auth: this.auth });
+        this.drive = google.drive({ version: 'v3', auth: this.auth });
     }
 
     async createSpreadsheet(title: string): Promise<string> {
@@ -202,5 +208,118 @@ export class GoogleSheetsService {
             console.error('Error getting spreadsheet info:', error);
             throw error;
         }
+    }
+
+    async uploadFile(filePath: string, folderId?: string): Promise<string> {
+        if (!this.drive) {
+            await this.authenticate();
+        }
+
+        if (!fs.existsSync(filePath)) {
+            throw new Error(`File not found: ${filePath}`);
+        }
+
+        const fileMetadata: any = {
+            name: path.basename(filePath),
+        };
+
+        if (folderId) {
+            fileMetadata.parents = [folderId];
+        }
+
+        const media = {
+            mimeType: 'application/octet-stream',
+            body: fs.createReadStream(filePath),
+        };
+
+        try {
+            const response = await this.drive.files.create({
+                resource: fileMetadata,
+                media: media,
+                fields: 'id,name,webViewLink',
+            });
+
+            console.log(`✅ File uploaded: ${response.data.name} (ID: ${response.data.id})`);
+            console.log(`🔗 View at: ${response.data.webViewLink}`);
+            
+            return response.data.id;
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            throw error;
+        }
+    }
+
+    async createFolder(name: string, parentFolderId?: string): Promise<string> {
+        if (!this.drive) {
+            await this.authenticate();
+        }
+
+        const fileMetadata: any = {
+            name: name,
+            mimeType: 'application/vnd.google-apps.folder',
+        };
+
+        if (parentFolderId) {
+            fileMetadata.parents = [parentFolderId];
+        }
+
+        try {
+            const response = await this.drive.files.create({
+                resource: fileMetadata,
+                fields: 'id,name,webViewLink',
+            });
+
+            console.log(`📁 Folder created: ${response.data.name} (ID: ${response.data.id})`);
+            return response.data.id;
+        } catch (error) {
+            console.error('Error creating folder:', error);
+            throw error;
+        }
+    }
+
+    async listFiles(folderId?: string): Promise<any[]> {
+        if (!this.drive) {
+            await this.authenticate();
+        }
+
+        try {
+            const query = folderId ? `'${folderId}' in parents` : undefined;
+            const response = await this.drive.files.list({
+                q: query,
+                fields: 'files(id,name,mimeType,createdTime,webViewLink)',
+                orderBy: 'createdTime desc',
+            });
+
+            return response.data.files || [];
+        } catch (error) {
+            console.error('Error listing files:', error);
+            throw error;
+        }
+    }
+
+    async uploadCSVToSheets(csvFilePath: string, spreadsheetName?: string): Promise<string> {
+        if (!fs.existsSync(csvFilePath)) {
+            throw new Error(`CSV file not found: ${csvFilePath}`);
+        }
+
+        // Read and parse CSV
+        const csvContent = fs.readFileSync(csvFilePath, 'utf-8');
+        const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+        const csvData = lines.map(line => 
+            line.split(',').map(cell => cell.replace(/"/g, '').trim())
+        );
+
+        // Create new spreadsheet
+        const fileName = spreadsheetName || `Import_${path.basename(csvFilePath, '.csv')}_${new Date().toISOString().slice(0, 10)}`;
+        const spreadsheetId = await this.createSpreadsheet(fileName);
+
+        // Write data to spreadsheet
+        if (csvData.length > 0) {
+            const range = `A1:${String.fromCharCode(65 + csvData[0].length - 1)}${csvData.length}`;
+            await this.writeData(spreadsheetId, range, csvData);
+        }
+
+        console.log(`📊 CSV converted to Google Sheets: ${fileName}`);
+        return spreadsheetId;
     }
 }

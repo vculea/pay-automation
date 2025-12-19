@@ -1,8 +1,10 @@
 import { Page, Locator } from '@playwright/test';
 
-export class ViewPage {
-   
+export class BtGoPage {
   readonly page: Page;
+  readonly usernameInput: Locator;
+  readonly passwordInput: Locator;
+  readonly loginButton: Locator; 
   readonly amountEl: Locator;    
   readonly transferInternal: Locator;  
   readonly valueInput: Locator; 
@@ -13,6 +15,9 @@ export class ViewPage {
 
     constructor(page: Page) {
         this.page = page;
+        this.usernameInput = page.locator('#user');
+        this.passwordInput = page.locator('#password');
+        this.loginButton = page.getByText('Autentifică-te');
         this.amountEl = page.locator('.amount');
         this.transferInternal = page.locator('#transferInternalBtn');
         this.valueInput = page.locator('#sourceAccountValueInput');
@@ -21,6 +26,16 @@ export class ViewPage {
         this.goToPaymentsLink = page.getByRole('link', { name: 'Mergi la plăți' });
         this.homeEl = page.getByRole('heading', { name: 'Acasă' });
     } 
+
+    async goto() {
+        await this.page.goto('https://goapp.bancatransilvania.ro/app/auth/login');
+    }
+
+    async login(credentials: any) {
+        await this.usernameInput.fill(credentials.btGoId);
+        await this.passwordInput.fill(credentials.btGoPassword);
+        await this.loginButton.click();
+    }  
 
     async getCurrentValue() {
        return await this.amountEl.nth(0).textContent();
