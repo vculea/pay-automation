@@ -13,6 +13,8 @@
   "include": [
     "tests/**/*",
     "playwright.config.ts",
-    "views/btgo/view.ts"  
-]
+    "views/**/*",
+    "utils/**/*",
+    "setup/**/*"
+  ]
 }

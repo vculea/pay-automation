@@ -296,30 +296,4 @@ export class GoogleSheetsService {
             throw error;
         }
     }
-
-    async uploadCSVToSheets(csvFilePath: string, spreadsheetName?: string): Promise<string> {
-        if (!fs.existsSync(csvFilePath)) {
-            throw new Error(`CSV file not found: ${csvFilePath}`);
-        }
-
-        // Read and parse CSV
-        const csvContent = fs.readFileSync(csvFilePath, 'utf-8');
-        const lines = csvContent.split('\n').filter(line => line.trim() !== '');
-        const csvData = lines.map(line => 
-            line.split(',').map(cell => cell.replace(/"/g, '').trim())
-        );
-
-        // Create new spreadsheet
-        const fileName = spreadsheetName || `Import_${path.basename(csvFilePath, '.csv')}_${new Date().toISOString().slice(0, 10)}`;
-        const spreadsheetId = await this.createSpreadsheet(fileName);
-
-        // Write data to spreadsheet
-        if (csvData.length > 0) {
-            const range = `A1:${String.fromCharCode(65 + csvData[0].length - 1)}${csvData.length}`;
-            await this.writeData(spreadsheetId, range, csvData);
-        }
-
-        console.log(`📊 CSV converted to Google Sheets: ${fileName}`);
-        return spreadsheetId;
-    }
 }

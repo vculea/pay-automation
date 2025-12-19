@@ -32,8 +32,8 @@ export class BtGoPage {
     }
 
     async login(credentials: any) {
-        await this.usernameInput.fill(credentials.btGoId);
-        await this.passwordInput.fill(credentials.btGoPassword);
+        await this.usernameInput.fill(credentials.btGo.id);
+        await this.passwordInput.fill(credentials.btGo.password);
         await this.loginButton.click();
     }  
 
