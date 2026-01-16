@@ -5,6 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
+  /* Timeout per test */
+  timeout: 120000, // 2 minute per test
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -23,8 +25,13 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     launchOptions: {
-      args: ["--start-maximized"],
+      args: [
+        "--start-maximized",
+        "--disable-blink-features=AutomationControlled", // Ascunde că e browser automat
+      ],
     },
+    // Folosește Chrome cu profilul tău unde ești deja logat
+    channel: 'chrome',
   },
 
   /* Configure projects for major browsers */
@@ -32,9 +39,9 @@ export default defineConfig({
     {
       name: 'chromium',
       use: {
-        //  ...devices['Desktop Chrome'],
         viewport: null,
-       },
+        headless: false, // Păstrează vizibil pentru a vedea ce se întâmplă
+      },
     },
 
     {
