@@ -27,18 +27,19 @@ export class BtGoPage {
         this.homeEl = page.getByRole('heading', { name: 'Acasă' });
     } 
 
-    async goto() {
+    async goTo() {
         await this.page.goto('https://goapp.bancatransilvania.ro/app/auth/login');
     }
 
     async login(credentials: any) {
+        await this.goTo();
         await this.usernameInput.fill(credentials.btGo.id);
         await this.passwordInput.fill(credentials.btGo.password);
         await this.loginButton.click();
     }  
 
     async getCurrentValue() {
-       return await this.amountEl.nth(0).textContent();
+       return await this.amountEl.first().textContent();
     }
 
     async moveIn(value: string) {
@@ -68,7 +69,6 @@ export class BtGoPage {
 
     async openFilter() {
         await this.page.click('#moreTransactionsBtn');
-        console.log("Filter opened");
     }
 
     async saveReport(days: { firstDay: string; lastDay: string }, cont: string) {
