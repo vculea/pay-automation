@@ -29,11 +29,12 @@ export class AppSheetPage {
         this.addWindow = page.getByTestId('FilteredData');
     } 
 
-    async goto() {
+    async goTo() {
         await this.page.goto('https://www.appsheet.com/start/6ab480fa-d9c8-4d57-aab6-4e4c2f615b76');
     }
 
     async login(credentials: any) {
+        await this.goTo();
         // Așteaptă ca butonul Google să fie disponibil
         await this.page.waitForSelector('#Google', { timeout: 10000 });
         await this.page.locator('#Google').click();

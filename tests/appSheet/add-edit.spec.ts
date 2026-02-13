@@ -9,8 +9,6 @@ const addData = [
 
 test('AppSheet I add values', async ({ page }) => {
     const viewPage = new AppSheetPage(page);
-    await viewPage.goto();
-    
     await viewPage.login(credentials.appSheet);
 
     console.log("Pregătesc să adaug items...");
@@ -31,8 +29,6 @@ const editData = [
 
 test('AppSheet I edit values', async ({ page }) => {
     const viewPage = new AppSheetPage(page);
-    await viewPage.goto();
-    
     await viewPage.login(credentials.appSheet);
 
     console.log("Pregătesc să editez items...");

@@ -11,7 +11,6 @@ test('BTGo Save reports and upload to Google Drive', async ({ page, storage }) =
     const viewPage = new BtGoPage(page);
     
     await test.step('Login to BTGo', async () => {
-        await viewPage.goto();
         await viewPage.login(credentials);
         console.log("Waiting for approval...");
     });
