@@ -73,60 +73,39 @@ export class AppSheetPage {
         await this.addWindow.getByLabel('Date').clear();
         await this.addWindow.getByLabel('Date').fill(formattedDate);
         
-        // Salvează
         await this.saveBtn.click();
-        
-        console.log(`✅ Item adăugat: ${item.name}`); 
     }
 
     async editItem(item: any){
-        // Navighează la luna corectă
         await this.navigateToMonth(item.date);
         
-        // Găsește elementul în listă după categorie și nume
         await this.findAndClickItem(item.categorie, item.name);
         
-        // Click pe butonul Edit
         await this.editBtn.click();
         
-        // Modifică prețul
         await this.priceField.clear();
         await this.priceField.fill(item.price);
         
-        // Salvează
         await this.saveBtn.click();
         
-        // Revino la dashboard
         await this.page.getByRole('navigation', { name: 'breadcrumbs' }).getByRole('button', { name: 'Dashboard' }).click();
-        
-        console.log(`✅ Item editat: ${item.name}`); 
     }
 
-    private async findAndClickItem(category: string, name: string, maxRetries: number = 2): Promise<void> {
-        const rowCount = await this.row.count();
-        
+    private async findAndClickItem(category: string, name: string, maxRetries: number = 5): Promise<void> {
         for (let attempt = 0; attempt < maxRetries; attempt++) {
-            // Caută grupul de categorie
-            const groupHeader = this.table.locator('.GroupedHeaderRow').filter({ hasText: category });
-            
-            // Caută elementul după grupul de categorie (următorul sibling care conține numele)
             const itemElement = this.table.locator('.DeckRow').filter({ hasText: name });
             
             const isPresent = await itemElement.count() > 0;
-            
             if (!isPresent) {
-                // Scroll la ultimul element pentru a încărca mai multe
-                const lastRow = this.row.nth(rowCount - 1);
+                const lastRow = this.row.last();
                 await lastRow.scrollIntoViewIfNeeded();
                 await this.page.waitForTimeout(500);
             } else {
-                // Scroll elementul în view și dă click
                 await itemElement.first().scrollIntoViewIfNeeded();
                 await itemElement.first().click();
                 return;
             }
         }
-        
         throw new Error(`Nu s-a găsit elementul "${name}" în categoria "${category}" după ${maxRetries} încercări`);
     }
 
@@ -137,7 +116,6 @@ export class AppSheetPage {
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00`;
     }
 
-    // Navighează la luna corectă folosind butoanele Prev/Next
     private async navigateToMonth(dateString: string, maxRetries: number = 12): Promise<void> {
         // Parse data item-ului (format MM/DD/YYYY)
         const [monthStr, dayStr, yearStr] = dateString.split('/');
@@ -150,12 +128,12 @@ export class AppSheetPage {
             
             // Parse data start (format yyyy-MM-dd)
             const startDate = new Date(value);
-            const actualMonth = startDate.getMonth() + 1; // getMonth() returnează 0-11
+            const actualMonth = startDate.getMonth() + 1;
             const actualYear = startDate.getFullYear();
 
             // Verifică dacă am ajuns la luna dorită
             if (targetMonth === actualMonth && targetYear === actualYear) {
-                return; // Success!
+                return;
             }
 
             // Navighează în funcție de diferența dintre luni/ani
@@ -165,7 +143,6 @@ export class AppSheetPage {
                 await this.nextBtn.click();
             }
 
-            // Așteaptă puțin pentru ca interfața să se actualizeze
             await this.page.waitForTimeout(300);
         }
 

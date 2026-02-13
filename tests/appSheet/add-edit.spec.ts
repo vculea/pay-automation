@@ -23,8 +23,10 @@ test('AppSheet I add values', async ({ page }) => {
 });
 
 const editData = [
-    { name: 'Rata Mai', categorie: 'Cheltuieli', subcategory: 'Rata', price: '1881.15', payment: 'Card', date: '05/15/2026' },
-    // { name: 'Rata Iulie', categorie: 'Cheltuieli', subcategory: 'Rata', price: '1872.45', payment: 'Card', date: '07/15/2026' },
+    { name: 'Rata Februarie', categorie: 'Cheltuieli', subcategory: 'Rata', price: '1902.9', payment: 'Card', date: '02/15/2026' },
+    { name: 'Rata Martie', categorie: 'Cheltuieli', subcategory: 'Rata', price: '1808.91', payment: 'Card', date: '03/15/2026' },
+    { name: 'Rata Aprilie', categorie: 'Cheltuieli', subcategory: 'Rata', price: '1893.19', payment: 'Card', date: '04/15/2026' },
+    { name: 'Rata Mai', categorie: 'Cheltuieli', subcategory: 'Rata', price: '1859.39', payment: 'Card', date: '05/15/2026' },
 ];
 
 test('AppSheet I edit values', async ({ page }) => {

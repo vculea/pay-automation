@@ -2,13 +2,31 @@ import { Page, Locator } from '@playwright/test';
 
 export class ANAFPage {
   readonly page: Page;
-  readonly selector: Locator;
+  readonly nameEl: Locator;
+  readonly prenumEl: Locator;
+  readonly cnpEl: Locator;
+  readonly casOrCass: Locator;
+  readonly selectVenitEl: Locator;
   readonly addButton: Locator;
+  readonly typeSelect: Locator;
+  readonly nrContract: Locator;
+  readonly dataContract: Locator;
+  readonly description: Locator;
+  readonly venitBrut: Locator;
 
     constructor(page: Page) {
         this.page = page;
-        this.selector = page.locator('#A_categ_venit_0');
+        this.nameEl = page.locator('#nume_c');
+        this.prenumEl = page.getByLabel('Prenume');
+        this.cnpEl = page.getByLabel('Cod de identificare fiscală');
+        this.casOrCass = page.locator('#pensionar');
+        this.selectVenitEl = page.locator('#A_categ_venit_0');
         this.addButton = page.getByRole('button', { name: 'Adaugă venit România +' });
+        this.typeSelect = page.getByRole('combobox').filter({ hasText: 'Alege tipul' }).first();
+        this.nrContract = page.getByLabel('Număr contract închiriere').first();
+        this.dataContract = page.getByLabel('Data contractului').first();
+        this.description = page.getByLabel('Datele de identificare a bunului pentru care se cedează folosința').first();
+        this.venitBrut = page.getByLabel('Venit brut').first();
     } 
 
     async goto() {
@@ -16,31 +34,29 @@ export class ANAFPage {
     }
 
     async fill(item: any) {
-        await this.page.locator('#nume_c').fill(item.name);
-        await this.page.getByLabel('Prenume').fill(item.prenume);
-        await this.page.getByLabel('Cod de identificare fiscală').fill(item.cnp);
+        await this.nameEl.fill(item.name);
+        await this.prenumEl.fill(item.prenume);
+        await this.cnpEl.fill(item.cnp);
+        await this.casOrCass.selectOption({value: '4'});
 
         for (const detail of item.items) {
-             console.log("Wait...");
-            
-            // Click până când elementul devine vizibil
-            let elementVisible = false;
-            while (!elementVisible) {
+            let elementVisible;
+            do {
                 await this.addButton.click();
-                await this.selector.waitFor({ state: 'visible', timeout: 2000 });
-                let cls = await this.selector.getAttribute('class');
+                await this.selectVenitEl.waitFor({ state: 'visible', timeout: 2000 });
+                let cls = await this.selectVenitEl.getAttribute('class');
                 elementVisible = cls !== null && !cls.includes('cursor-not-allowed');
-            }
-            
-            await this.selector.click();
-            await this.selector.selectOption({ value: detail.category });
-
-            await this.page.getByRole('combobox').filter({ hasText: 'Alege tipul' }).selectOption({ label: detail.type });
-            await this.page.getByLabel('Număr contract închiriere').first().fill(detail.contract);
-            await this.page.getByLabel('Data contractului').first().fill(detail.data);
-            await this.page.getByLabel('Datele de identificare a bunului pentru care se cedează folosința').first().fill(detail.description);
-            await this.page.getByLabel('Datele de identificare a bunului pentru care se cedează folosința').first().click();
-            await this.page.getByLabel('Venit brut').first().fill(detail.venit);
+            } while (!elementVisible);
+            await this.selectVenitEl.click();
+            await this.selectVenitEl.selectOption({ value: detail.category });
+            await this.typeSelect.selectOption({ label: detail.type });
+            await this.nrContract.fill(detail.contract);
+            await this.dataContract.fill(detail.data);
+            await this.dataContract.press('Enter');
+            await this.description.fill(detail.description);
+            await this.description.press('Enter');
+            await this.venitBrut.fill(detail.venit);
+            await this.venitBrut.press('Enter');
             console.log("Verify...");
         }
     }    
