@@ -5,7 +5,8 @@ import { ANAFPage } from '../../views/ANAF/view';
 test('ANAF complete D212', async ({ page }) => {
     const viewPage = new ANAFPage(page);
     await viewPage.goto();    
-    await viewPage.fill(dataJson.viorel);
+    await viewPage.fill(dataJson.sveta);
+    await viewPage.downloadPDF();
 
     console.log("✅ Toate items adăugate cu succes!"); 
 });

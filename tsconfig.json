@@ -7,14 +7,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "types": ["node"]
   },
-  "include": [
-    "tests/**/*",
-    "playwright.config.ts",
-    "views/**/*",
-    "utils/**/*",
-    "setup/**/*"
-  ]
+  "include": ["tests/**/*", "playwright.config.ts", "views/**/*", "utils/**/*", "setup/**/*"]
 }
