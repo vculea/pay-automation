@@ -60,6 +60,7 @@ export default defineConfig({
       dependencies: ['caserie-auth'],
       use: {
         storageState: caserieAuthFile,
+        actionTimeout: 15_000,
         headless: false,
         viewport: null,
         trace: 'off',

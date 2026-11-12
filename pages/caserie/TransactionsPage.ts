@@ -38,6 +38,7 @@ export class TransactionsPage {
   readonly periodSelector: Locator;
   readonly emptyMessage: Locator;
   readonly loadMoreButton: Locator;
+  readonly loadingProgress: Locator;
   readonly editButton: Locator;
   readonly dialog: Locator;
   readonly eInvoiceCard: Locator;
@@ -52,6 +53,7 @@ export class TransactionsPage {
     this.periodSelector = page.getByRole("combobox", { name: "Perioada" });
     this.emptyMessage = page.getByText("Nu există tranzacții pentru criteriile curente.", { exact: true });
     this.loadMoreButton = page.getByRole("button", { name: "Încarcă mai multe", exact: true });
+    this.loadingProgress = page.getByText(/Încărcate\s+\d+\s+din\s+\d+/).first();
     this.editButton = page.getByRole("button", { name: "Editează" });
     this.dialog = page.getByRole("dialog");
     this.eInvoiceCard = this.dialog.getByRole("group", { name: "eFactură" });
@@ -132,10 +134,40 @@ export class TransactionsPage {
   }
 
   private async loadAllRows() {
-    while (await this.loadMoreButton.count()) {
-      const loaded = await this.rows.count();
-      await this.loadMoreButton.click();
-      await expect.poll(() => this.rows.count(), { timeout: 30_000 }).toBeGreaterThan(loaded);
+    if (await this.emptyMessage.isVisible()) return;
+
+    const getProgress = async () => {
+      const text = await this.loadingProgress.innerText({ timeout: 15_000 });
+      const match = text.match(/Încărcate\s+(\d+)\s+din\s+(\d+)/);
+      if (!match) throw new Error(`Unexpected transaction loading progress: ${text}`);
+      return { loaded: Number(match[1]), total: Number(match[2]) };
+    };
+
+    let progress = await getProgress();
+    while (progress.loaded < progress.total) {
+      const previous = progress.loaded;
+      await expect.poll(async () => {
+        const current = await getProgress();
+        return current.loaded > previous || await this.loadMoreButton.isEnabled();
+      }, { timeout: 15_000, message: "Transactions did not finish loading or become ready to load more" }).toBe(true);
+
+      progress = await getProgress();
+      if (progress.loaded > previous) continue;
+
+      try {
+        await this.loadMoreButton.click({ timeout: 5_000 });
+      } catch (error) {
+        // The table can load automatically while Playwright is trying to click.
+        progress = await getProgress();
+        if (progress.loaded <= previous) throw error;
+        continue;
+      }
+
+      await expect.poll(async () => (await getProgress()).loaded, {
+        timeout: 15_000,
+        message: "Loading more transactions made no progress"
+      }).toBeGreaterThan(previous);
+      progress = await getProgress();
     }
   }
 
