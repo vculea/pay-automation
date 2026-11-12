@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { credentials } from "../../utils/configs";
-import { AppSheetPage } from "../../views/appSheet/view";
+import { AppSheetPage } from "../../pages/appSheet/view";
 
 const addData = [
   //   {

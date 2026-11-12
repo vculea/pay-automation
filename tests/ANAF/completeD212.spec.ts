@@ -1,12 +1,12 @@
-import { test, expect } from '@playwright/test';
-import { dataJson } from '../../utils/configs';
-import { ANAFPage } from '../../views/ANAF/view';
+import { test, expect } from "@playwright/test";
+import { dataJson } from "../../utils/configs";
+import { ANAFPage } from "../../pages/ANAF/view";
 
-test('ANAF complete D212', async ({ page }) => {
-    const viewPage = new ANAFPage(page);
-    await viewPage.goto();    
-    await viewPage.fill(dataJson.sveta);
-    await viewPage.downloadPDF();
+test("ANAF complete D212", async ({ page }) => {
+  const viewPage = new ANAFPage(page);
+  await viewPage.goto();
+  await viewPage.fill(dataJson.sveta);
+  await viewPage.downloadPDF();
 
-    console.log("✅ Toate items adăugate cu succes!"); 
+  console.log("✅ Toate items adăugate cu succes!");
 });

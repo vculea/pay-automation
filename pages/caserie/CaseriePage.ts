@@ -1,0 +1,105 @@
+import { Page, Locator, expect } from "@playwright/test";
+import { caserieUrl } from "../../setup/caserieAuth";
+
+export class CaseriePage {
+  readonly page: Page;
+  readonly usernameInput: Locator;
+  readonly passwordInput: Locator;
+  readonly loginButton: Locator;
+  readonly amountEl: Locator;
+  readonly transferInternal: Locator;
+  readonly valueInput: Locator;
+  readonly nextButton: Locator;
+  readonly transferaButton: Locator;
+  readonly goToPaymentsLink: Locator;
+  readonly homeEl: Locator;
+
+  constructor(page: Page) {
+    this.page = page;
+    this.usernameInput = page.locator("#user");
+    this.passwordInput = page.locator("#password");
+    this.loginButton = page.getByRole("button", { name: "Continuă cu Google" });
+    this.amountEl = page.locator(".amount");
+    this.transferInternal = page.locator("#transferInternalBtn");
+    this.valueInput = page.locator("#sourceAccountValueInput");
+    this.nextButton = page.getByRole("button", { name: "Mergi mai departe" });
+    this.transferaButton = page.getByRole("button", { name: "Transferă" });
+    this.goToPaymentsLink = page.getByRole("link", { name: "Mergi la plăți" });
+    this.homeEl = page.getByRole("heading", { name: "Acasă" });
+  }
+
+  async goTo() {
+    await this.page.goto(caserieUrl);
+  }
+
+  async login() {
+    await this.goTo();
+    await this.expectAuthenticated();
+  }
+
+  async expectAuthenticated(timeout = 15_000) {
+    await expect(this.page.getByRole("main")).toBeVisible({ timeout });
+    await expect(this.page, "Caserie must open an authenticated route, not the Google login page").toHaveURL(
+      url => url.origin === new URL(caserieUrl).origin && url.pathname !== "/login",
+      { timeout }
+    );
+    await expect(this.loginButton).toBeHidden();
+  }
+
+  async getCurrentValue() {
+    return await this.amountEl.first().textContent();
+  }
+
+  async moveIn(value: string) {
+    await this.transferInternal.click();
+    await this.valueInput.fill(value);
+    await this.nextButton.click();
+    await this.transferaButton.click();
+    await this.goToPaymentsLink.click();
+    await this.homeEl.click();
+  }
+
+  async getFirstDayOfMonthAndLastDayOfMonth(monthName: string) {
+    for (let month = 0; month < 12; month++) {
+      const date = new Date();
+      date.setMonth(month);
+      const name = date.toLocaleString("ro-RO", { month: "long" });
+      if (name.toLowerCase() === monthName.toLowerCase()) {
+        const firstDay = new Date(date.getFullYear(), month, 1);
+        const lastDay = new Date(date.getFullYear(), month + 1, 0);
+        const firstDayStr = firstDay.toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const lastDayStr = lastDay.toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });
+        return { firstDay: firstDayStr, lastDay: lastDayStr };
+      }
+    }
+    return { firstDay: "", lastDay: "" };
+  }
+
+  async openFilter() {
+    await this.page.click("#moreTransactionsBtn");
+  }
+
+  async saveReport(days: { firstDay: string; lastDay: string }, cont: string) {
+    await this.page.getByRole("button", { name: "Filtrează" }).click();
+    await this.page.click("#periodOTHERRadioBtn");
+    await this.page.locator('[placeholder="De la"]').fill(days.firstDay);
+    await this.page.locator('[placeholder="Până la"]').fill(days.lastDay);
+    await this.page.click("#applyFiltersBtn");
+    await this.page.locator("#reportTypeSwitch").filter({ hasText: "CSV" }).click();
+
+    await this.page.click("#selectAccountBtn");
+    await this.page.locator(".item").filter({ hasText: cont }).click();
+
+    await this.page.click("#generateReportsBtn");
+
+    const downloadPromise = this.page.waitForEvent("download");
+    await this.page.locator('[data-mat-icon-name="downloadBulk"]').first().click();
+    const download = await downloadPromise;
+    const fileName = `${cont}_${days.firstDay.replace(/\//g, "-")}_${days.lastDay.replace(/\//g, "-")}.csv`;
+    const downloadPath = `./downloads/${fileName}`;
+    await download.saveAs(downloadPath);
+
+    console.log(`Report saved successfully: ${fileName}`);
+    return fileName;
+  }
+}

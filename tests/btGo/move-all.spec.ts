@@ -1,16 +1,15 @@
-import { test, expect } from '@playwright/test';
-import { credentials } from '../../utils/configs';
-import { BtGoPage } from '../../views/btGo/view';
+import { test, expect } from "@playwright/test";
+import { credentials } from "../../utils/configs";
+import { BtGoPage } from "../../pages/btGo/view";
 
-test('BTGo Move all values from current cont to cont economii', async ({ page }) => {
-    const viewPage = new BtGoPage(page);
-    await viewPage.login(credentials);
+test("BTGo Move all values from current cont to cont economii", async ({ page }) => {
+  const viewPage = new BtGoPage(page);
+  await viewPage.login(credentials);
 
-    console.log("Waiting for approval...");
+  console.log("Waiting for approval...");
 
-    const value = await viewPage.getCurrentValue();
-    await viewPage.moveIn(value || '0');
+  const value = await viewPage.getCurrentValue();
+  await viewPage.moveIn(value || "0");
 
-    console.log("stop"); 
+  console.log("stop");
 });
-

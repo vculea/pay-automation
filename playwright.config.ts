@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { caserieAuthFile } from './setup/caserieAuth';
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -38,9 +39,30 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
+      testIgnore: '**/caserie/**',
       use: {
         viewport: null,
         headless: false, // Păstrează vizibil pentru a vedea ce se întâmplă
+      },
+    },
+    {
+      name: 'caserie-auth',
+      testDir: './setup',
+      testMatch: 'caserie.auth.setup.ts',
+      use: {
+        headless: false,
+        viewport: null,
+      },
+    },
+    {
+      name: 'caserie',
+      testMatch: '**/caserie/**/*.spec.ts',
+      dependencies: ['caserie-auth'],
+      use: {
+        storageState: caserieAuthFile,
+        headless: false,
+        viewport: null,
+        trace: 'off',
       },
     },
 

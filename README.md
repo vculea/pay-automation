@@ -33,6 +33,32 @@ npm run test:ui
 npm run test:debug
 ```
 
+### Caserie: reusable Google authentication
+
+Start Caserie at `http://localhost:5173/`, then run:
+
+```powershell
+npx playwright test --project=caserie --workers=1
+```
+
+On the first run, complete Google login (including any MFA) in the opened
+browser. The authentication setup waits up to four minutes and saves the
+application-origin cookies, localStorage and IndexedDB to
+`playwright/.auth/caserie.json`. Caserie uses Firebase `browserSessionPersistence`,
+so its sessionStorage is saved separately to `playwright/.auth/caserie.session.json`
+and restored before the application loads, only on the Caserie origin.
+Later runs validate and reuse this session in a new browser context.
+If it expires, the setup asks for Google login again.
+
+This uses an isolated browser rather than your personal Chrome profile.
+Both session files grant access to the application: never share or commit them.
+The existing `playwright/.auth/` ignore rule excludes it from Git.
+To switch accounts, delete only `playwright/.auth/caserie.json` and
+`playwright/.auth/caserie.session.json`, then run again.
+Authentication traces, screenshots, and videos are disabled.
+
+The Caserie test verifies authentication only; it does not add financial records.
+
 ### Test Structure
 
 The project contains automated tests for Sencha ExtJS Kitchen Sink Array Grid component:
