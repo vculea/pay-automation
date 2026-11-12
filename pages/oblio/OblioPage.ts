@@ -57,9 +57,8 @@ export class OblioPage {
       const oldest = Math.min(...documents.map(d => d.receivedDate.getTime()));
       const next = this.page.locator(".pagination a.page-link", { hasText: new RegExp(`^${pageNo + 1}$`) }).first();
       if (oldest < oldestDate.getTime() || !(await next.count())) break;
-      const firstRowText = await rows.first().innerText();
       await next.click();
-      await expect(rows.first()).not.toHaveText(firstRowText);
+      await expect(this.page.locator(".pagination .active")).toHaveText(String(pageNo + 1));
     }
     return documents;
   }
@@ -72,9 +71,15 @@ export class OblioPage {
 
   async login(credentials: any) {
     await this.goTo();
-    if (await this.cookieConsentButton.isVisible()) {
+    try {
+      await this.cookieConsentButton.waitFor({ state: "visible", timeout: 10_000 });
       await this.cookieConsentButton.click();
+    } catch (error) {
+      if (!(error instanceof Error) || error.name !== "TimeoutError") {
+        throw error;
+      }
     }
+    await expect(this.usernameInput).toBeVisible();
     await this.usernameInput.fill(credentials.oblio.email);
     await this.passwordInput.fill(credentials.oblio.password);
     await this.loginButton.click();
