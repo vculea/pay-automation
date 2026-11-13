@@ -8,6 +8,7 @@ export interface Transaction {
   description: string;
   amount: number;
   currency: string;
+  hasEInvoice: boolean;
   rowText: string;
   rowIndex: number;
 }
@@ -41,7 +42,8 @@ export class TransactionsPage {
   readonly loadingProgress: Locator;
   readonly editButton: Locator;
   readonly dialog: Locator;
-  readonly eInvoiceCard: Locator;
+  readonly attachments: Locator;
+  readonly eInvoiceList: Locator;
   readonly eInvoiceInput: Locator;
   readonly saveButton: Locator;
   private period: Period | null = null;
@@ -56,8 +58,10 @@ export class TransactionsPage {
     this.loadingProgress = page.getByText(/Încărcate\s+\d+\s+din\s+\d+/).first();
     this.editButton = page.getByRole("button", { name: "Editează" });
     this.dialog = page.getByRole("dialog");
-    this.eInvoiceCard = this.dialog.getByRole("group", { name: "eFactură" });
-    this.eInvoiceInput = this.dialog.getByLabel("Fișier: eFactură");
+    this.attachments = this.dialog.getByRole("group", { name: "Documente atașate și chitanță", exact: true });
+    // Invoices are paired per row ("Factură N" / "eFactură N"); a stored eFactură renders as list "eFactură N".
+    this.eInvoiceList = this.attachments.getByRole("list", { name: /^eFactură \d+$/ });
+    this.eInvoiceInput = this.attachments.getByLabel(/^Fișier: eFactură \d+$/).first();
     this.saveButton = this.dialog.getByRole("button", { name: "Salvează" });
   }
 
@@ -101,12 +105,17 @@ export class TransactionsPage {
     const from = `${period.year}-${String(period.month + 1).padStart(2, "0")}-01`;
     const lastDay = new Date(Date.UTC(period.year, period.month + 1, 0)).getUTCDate();
     const to = `${period.year}-${String(period.month + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    return this.page.waitForResponse(response => {
-      const url = new URL(response.url());
-      return url.pathname.endsWith("/transactions")
-        && url.searchParams.get("dateFrom") === from
-        && url.searchParams.get("dateTo") === to;
-    }, { timeout: 30_000 });
+    return this.page.waitForResponse(
+      response => {
+        const url = new URL(response.url());
+        return (
+          url.pathname.endsWith("/transactions") &&
+          url.searchParams.get("dateFrom") === from &&
+          url.searchParams.get("dateTo") === to
+        );
+      },
+      { timeout: 30_000 }
+    );
   }
 
   private async responseHasTransactions(response: Response, period: Period) {
@@ -119,18 +128,23 @@ export class TransactionsPage {
   }
 
   private async waitForPeriodContent(period: Period, hasTransactions: boolean) {
-    await expect.poll(async () => {
-      if (!hasTransactions) {
-        return (await this.rows.count()) === 0 && await this.emptyMessage.isVisible();
-      }
-      const row = this.rows.first();
-      if (!(await row.count())) return false;
-      const date = parseRoDate(await row.locator("td").nth(1).innerText());
-      return date.getFullYear() === period.year && date.getMonth() === period.month;
-    }, {
-      message: `Transactions for ${MONTHS[period.month]} ${period.year} did not load`,
-      timeout: 30_000
-    }).toBe(true);
+    await expect
+      .poll(
+        async () => {
+          if (!hasTransactions) {
+            return (await this.rows.count()) === 0 && (await this.emptyMessage.isVisible());
+          }
+          const row = this.rows.first();
+          if (!(await row.count())) return false;
+          const date = parseRoDate(await row.locator("td").nth(1).innerText());
+          return date.getFullYear() === period.year && date.getMonth() === period.month;
+        },
+        {
+          message: `Transactions for ${MONTHS[period.month]} ${period.year} did not load`,
+          timeout: 30_000
+        }
+      )
+      .toBe(true);
   }
 
   private async loadAllRows() {
@@ -146,10 +160,15 @@ export class TransactionsPage {
     let progress = await getProgress();
     while (progress.loaded < progress.total) {
       const previous = progress.loaded;
-      await expect.poll(async () => {
-        const current = await getProgress();
-        return current.loaded > previous || await this.loadMoreButton.isEnabled();
-      }, { timeout: 15_000, message: "Transactions did not finish loading or become ready to load more" }).toBe(true);
+      await expect
+        .poll(
+          async () => {
+            const current = await getProgress();
+            return current.loaded > previous || (await this.loadMoreButton.isEnabled());
+          },
+          { timeout: 15_000, message: "Transactions did not finish loading or become ready to load more" }
+        )
+        .toBe(true);
 
       progress = await getProgress();
       if (progress.loaded > previous) continue;
@@ -163,10 +182,12 @@ export class TransactionsPage {
         continue;
       }
 
-      await expect.poll(async () => (await getProgress()).loaded, {
-        timeout: 15_000,
-        message: "Loading more transactions made no progress"
-      }).toBeGreaterThan(previous);
+      await expect
+        .poll(async () => (await getProgress()).loaded, {
+          timeout: 15_000,
+          message: "Loading more transactions made no progress"
+        })
+        .toBeGreaterThan(previous);
       progress = await getProgress();
     }
   }
@@ -175,20 +196,31 @@ export class TransactionsPage {
     await this.loadAllRows();
     const result: Transaction[] = [];
     for (const [rowIndex, row] of (await this.rows.all()).entries()) {
-      const cells = row.locator("td");
-      const [amount, currency] = (await cells.nth(8).innerText()).trim().split(/\s+/);
       result.push({
-        date: parseRoDate(await cells.nth(1).innerText()),
-        type: (await cells.nth(2).innerText()).trim(),
-        category: (await cells.nth(4).innerText()).trim(),
-        description: (await cells.nth(6).innerText()).trim(),
-        amount: Math.abs(Number(amount.replace(/\./g, "").replace(",", "."))),
-        currency,
+        ...(await this.readRow(row)),
         rowText: (await row.innerText()).replace(/\s+/g, " "),
         rowIndex
       });
     }
     return result;
+  }
+
+  private async readRow(row: Locator) {
+    const cells = row.locator("td");
+    const [amount, currency] = (await cells.nth(9).innerText()).trim().split(/\s+/);
+    const invoiceStatus = (await cells.nth(8).innerText()).trim();
+    if (!["Da", "Nu", "—"].includes(invoiceStatus)) {
+      throw new Error(`Unexpected eFactura grid status: ${invoiceStatus}`);
+    }
+    return {
+      date: parseRoDate(await cells.nth(1).innerText()),
+      type: (await cells.nth(2).innerText()).trim(),
+      category: (await cells.nth(4).innerText()).trim(),
+      description: (await cells.nth(6).innerText()).trim(),
+      amount: Math.abs(Number(amount.replace(/\./g, "").replace(",", "."))),
+      currency,
+      hasEInvoice: invoiceStatus === "Da"
+    };
   }
 
   async openEdit(transaction: Transaction) {
@@ -205,19 +237,14 @@ export class TransactionsPage {
     if (!(await row.count())) {
       throw new Error(`Transaction row not found: ${transaction.rowText}`);
     }
-    const rowDate = parseRoDate(await row.locator("td").nth(1).innerText());
-    const rowType = (await row.locator("td").nth(2).innerText()).trim();
-    const rowCategory = (await row.locator("td").nth(4).innerText()).trim();
-    const rowDescription = (await row.locator("td").nth(6).innerText()).trim();
-    const [amount, currency] = (await row.locator("td").nth(8).innerText()).trim().split(/\s+/);
-    const rowAmount = Math.abs(Number(amount.replace(/\./g, "").replace(",", ".")));
+    const current = await this.readRow(row);
     if (
-      rowDate.getTime() !== transaction.date.getTime()
-      || rowType !== transaction.type
-      || rowCategory !== transaction.category
-      || rowDescription !== transaction.description
-      || rowAmount !== transaction.amount
-      || currency !== transaction.currency
+      current.date.getTime() !== transaction.date.getTime() ||
+      current.type !== transaction.type ||
+      current.category !== transaction.category ||
+      current.description !== transaction.description ||
+      current.amount !== transaction.amount ||
+      current.currency !== transaction.currency
     ) {
       throw new Error(`Transaction row no longer matches: ${transaction.rowText}`);
     }
@@ -226,14 +253,43 @@ export class TransactionsPage {
     await expect(this.dialog).toBeVisible();
   }
 
-  async hasEInvoice(): Promise<boolean> {
-    await expect(this.eInvoiceCard).toBeVisible();
-    return (await this.eInvoiceCard.getByTestId("file-drop-zone").count()) === 0;
+  async getEInvoiceState(): Promise<"attached" | "available" | "unavailable"> {
+    // Linked attachment groups render only after the stored documents have loaded.
+    await expect(this.attachments.getByRole("group").first()).toBeVisible({ timeout: 30_000 });
+    const storedInvoices = this.attachments.getByRole("listitem").filter({ hasText: /eFactură\s*·/ });
+    if (await storedInvoices.count()) return "attached";
+    return (await this.eInvoiceInput.count()) > 0 ? "available" : "unavailable";
+  }
+
+  async closeEdit() {
+    await this.dialog.getByRole("button", { name: "Anulează", exact: true }).click();
+    await expect(this.dialog).toBeHidden();
   }
 
   async attachEInvoice(file: { name: string; buffer: Buffer }) {
+    const uploaded = this.page.waitForResponse(
+      response => new URL(response.url()).pathname.endsWith("/documents") && response.request().method() === "POST",
+      { timeout: 60_000 }
+    );
     await this.eInvoiceInput.setInputFiles({ name: file.name, mimeType: "application/pdf", buffer: file.buffer });
-    await expect(this.eInvoiceCard.getByText(file.name)).toBeVisible();
+    const response = await uploaded;
+    expect(response.ok(), `Uploading Oblio PDF ${file.name}: HTTP ${response.status()}`).toBeTruthy();
+    const document: unknown = await response.json();
+    if (
+      typeof document !== "object" ||
+      document === null ||
+      !("storedFileName" in document) ||
+      typeof document.storedFileName !== "string" ||
+      !document.storedFileName ||
+      !("type" in document) ||
+      document.type !== "EFACTURA"
+    ) {
+      throw new Error(`Unexpected eFactura upload response for ${file.name}`);
+    }
+    // Caserie assigns its own filename; wait for that document, not the selected filename.
+    await expect(this.eInvoiceList.getByRole("listitem").getByText(document.storedFileName, { exact: true })).toBeVisible({
+      timeout: 60_000
+    });
     await this.saveButton.click();
     await expect(this.dialog).toBeHidden({ timeout: 60_000 });
   }

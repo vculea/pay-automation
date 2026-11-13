@@ -57,7 +57,24 @@ To switch accounts, delete only `playwright/.auth/caserie.json` and
 `playwright/.auth/caserie.session.json`, then run again.
 Authentication traces, screenshots, and videos are disabled.
 
-The Caserie test verifies authentication only; it does not add financial records.
+The authentication setup does not add financial records. Caserie specs can modify real data.
+
+### Caserie: attach Oblio invoices
+
+```powershell
+npx playwright test oblio.spec.ts --project=caserie --workers=1 --retries=0
+```
+
+This test attaches PDFs to matching expense transactions. Exact amounts take
+priority; amounts sharing the first decimal digit are also considered, with a
+warning in the console and test report. Transactions marked "Da" in the grid's
+eFactura column are skipped without opening the edit dialog or downloading a PDF.
+For other transactions the dialog is checked again, detecting existing eFactura
+documents even under "Alte documente atasate". If the dialog does not offer an eFactura
+upload zone (for example, special donations or commissions), the transaction is
+skipped with a warning and its candidate invoice remains available for other
+transactions. The test checks the upload response and waits for the server-assigned
+filename to appear in the stored attachment list before saving.
 
 ### Test Structure
 
