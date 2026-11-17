@@ -2,31 +2,12 @@ import { OblioDocument, OblioPage } from "../../pages/oblio/OblioPage";
 import { Transaction, TransactionsPage } from "../../pages/caserie/TransactionsPage";
 import { test } from "../../setup/caserieTest";
 import { credentials } from "../../utils/configs";
+import { amountDifferenceInCents, findDocument, TOLERANCE_DAYS } from "../../utils/oblioMatching";
 
-const TOLERANCE_DAYS = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FIRST_SUPPORTED_YEAR = 2024;
 // Expense categories can further restrict the attachment zone; inspect the edit dialog before uploading.
 const EXPENSE_TYPE = "Cheltuială";
-
-function dateDistance(transaction: Transaction, document: OblioDocument) {
-  return Math.min(
-    Math.abs(transaction.date.getTime() - document.documentDate.getTime()),
-    Math.abs(transaction.date.getTime() - document.receivedDate.getTime())
-  );
-}
-
-function amountInCents(amount: number) {
-  return Math.round(Math.abs(amount) * 100);
-}
-
-function amountDifferenceInCents(left: number, right: number) {
-  return Math.abs(amountInCents(left) - amountInCents(right));
-}
-
-function amountsShareTenths(left: number, right: number) {
-  return Math.floor(amountInCents(left) / 10) === Math.floor(amountInCents(right) / 10);
-}
 
 test("Attach Oblio eFactura to every matching transaction", async ({ page, context }) => {
   test.setTimeout(30 * 60 * 1000);
@@ -68,21 +49,8 @@ test("Attach Oblio eFactura to every matching transaction", async ({ page, conte
     const skipped: string[] = [];
 
     for (const transaction of transactions) {
-      if (transaction.type !== EXPENSE_TYPE) continue;
-      const candidates = [...unused]
-        .filter(
-          d =>
-            d.currency === transaction.currency &&
-            amountsShareTenths(d.amount, transaction.amount) &&
-            dateDistance(transaction, d) <= TOLERANCE_DAYS * DAY_MS
-        )
-        .sort(
-          (a, b) =>
-            amountDifferenceInCents(transaction.amount, a.amount) -
-              amountDifferenceInCents(transaction.amount, b.amount) ||
-            dateDistance(transaction, a) - dateDistance(transaction, b)
-        );
-      const document = candidates[0];
+      if (transaction.type !== EXPENSE_TYPE || transaction.eInvoiceStatus !== "Nu") continue;
+      const document = findDocument(transaction, transaction.amount, unused);
       const amountDifference = document ? amountDifferenceInCents(transaction.amount, document.amount) : 0;
       if (document && amountDifference > 0) {
         const warning =
@@ -94,17 +62,94 @@ test("Attach Oblio eFactura to every matching transaction", async ({ page, conte
         test.info().annotations.push({ type: "warning", description: warning });
       }
 
-      if (transaction.hasEInvoice) {
-        if (document) unused.delete(document);
-        skipped.push(`${transaction.category} ${transaction.amount} (already has eFactura in grid)`);
-        continue;
-      }
-      if (!document) {
-        unmatched.push(transaction);
+      const edit = await transactionsPage.openEdit(transaction);
+      if (edit.status === "blocked") {
+        const warning =
+          `${transaction.date.toLocaleDateString("ro-RO")} ${transaction.category} ` +
+          `${transaction.amount.toFixed(2)} ${transaction.currency}: ${edit.reason}`;
+        console.warn(`WARNING: ${warning}`);
+        test.info().annotations.push({ type: "warning", description: warning });
+        skipped.push(warning);
         continue;
       }
 
-      await transactionsPage.openEdit(transaction);
+      if (!document) {
+        const invoiceSlots = await transactionsPage.getInvoiceSlots();
+        if (!invoiceSlots.length) {
+          await transactionsPage.closeEdit();
+          unmatched.push(transaction);
+          continue;
+        }
+
+        const selected = new Set<OblioDocument>();
+        const uploads: {
+          slot: number;
+          amount: number;
+          file: { name: string; buffer: Buffer };
+          document: OblioDocument;
+        }[] = [];
+        for (const slot of invoiceSlots) {
+          const slotDocument = findDocument(
+            transaction,
+            slot.amount,
+            [...unused].filter(candidate => !selected.has(candidate))
+          );
+          if (!slotDocument) {
+            const warning =
+              `${transaction.date.toLocaleDateString("ro-RO")} ${transaction.category} ` +
+              `invoice ${slot.index} (${slot.amount.toFixed(2)} ${transaction.currency}): no matching Oblio document.`;
+            console.warn(`WARNING: ${warning}`);
+            test.info().annotations.push({ type: "warning", description: warning });
+            continue;
+          }
+          selected.add(slotDocument);
+          if (slot.eInvoiceStored) {
+            unused.delete(slotDocument);
+            skipped.push(
+              `${transaction.category} invoice ${slot.index} ${slot.amount} (already has eFactura: ` +
+                `${slotDocument.supplier} ${slotDocument.number})`
+            );
+            continue;
+          }
+          if (!slot.eInvoiceUploadable) {
+            const warning =
+              `${transaction.date.toLocaleDateString("ro-RO")} ${transaction.category} ` +
+              `invoice ${slot.index} ${slot.amount.toFixed(2)} ${transaction.currency}: eFactura upload is unavailable; ` +
+              `Oblio ${slotDocument.supplier} ${slotDocument.number} was not attached.`;
+            console.warn(`WARNING: ${warning}`);
+            test.info().annotations.push({ type: "warning", description: warning });
+            continue;
+          }
+          const name = `${slotDocument.number.replace(/[^\w.-]+/g, "_")}.pdf`;
+          uploads.push({
+            slot: slot.index,
+            amount: slot.amount,
+            file: { name, buffer: await oblio.downloadPdf(slotDocument) },
+            document: slotDocument
+          });
+        }
+
+        if (uploads.length) {
+          await transactionsPage.attachEInvoices(uploads);
+          for (const { document: uploadedDocument } of uploads) {
+            unused.delete(uploadedDocument);
+          }
+          attached.push(
+            `${transaction.category} ${transaction.amount} <- ` +
+              uploads
+                .map(
+                  ({ amount, document: uploadedDocument }) =>
+                    `${amount.toFixed(2)} ${transaction.currency}: ${uploadedDocument.supplier} ${uploadedDocument.number}`
+                )
+                .join(" + ")
+          );
+        } else {
+          await transactionsPage.closeEdit();
+          if (!selected.size) unmatched.push(transaction);
+        }
+        continue;
+      }
+
       const invoiceState = await transactionsPage.getEInvoiceState();
       if (invoiceState === "attached") {
         unused.delete(document);

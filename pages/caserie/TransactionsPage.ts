@@ -9,8 +9,16 @@ export interface Transaction {
   amount: number;
   currency: string;
   hasEInvoice: boolean;
+  eInvoiceStatus: "Da" | "Nu" | "—";
   rowText: string;
   rowIndex: number;
+}
+
+export interface InvoiceSlot {
+  index: number;
+  amount: number;
+  eInvoiceStored: boolean;
+  eInvoiceUploadable: boolean;
 }
 
 interface Period {
@@ -205,11 +213,11 @@ export class TransactionsPage {
     return result;
   }
 
-  private async readRow(row: Locator) {
+  private async readRow(row: Locator): Promise<Omit<Transaction, "rowText" | "rowIndex">> {
     const cells = row.locator("td");
     const [amount, currency] = (await cells.nth(9).innerText()).trim().split(/\s+/);
     const invoiceStatus = (await cells.nth(8).innerText()).trim();
-    if (!["Da", "Nu", "—"].includes(invoiceStatus)) {
+    if (invoiceStatus !== "Da" && invoiceStatus !== "Nu" && invoiceStatus !== "—") {
       throw new Error(`Unexpected eFactura grid status: ${invoiceStatus}`);
     }
     return {
@@ -219,11 +227,12 @@ export class TransactionsPage {
       description: (await cells.nth(6).innerText()).trim(),
       amount: Math.abs(Number(amount.replace(/\./g, "").replace(",", "."))),
       currency,
-      hasEInvoice: invoiceStatus === "Da"
+      hasEInvoice: invoiceStatus === "Da",
+      eInvoiceStatus: invoiceStatus
     };
   }
 
-  async openEdit(transaction: Transaction) {
+  async openEdit(transaction: Transaction): Promise<{ status: "opened" } | { status: "blocked"; reason: string }> {
     if (!this.pageReady) await this.goTo();
     const transactionPeriod = {
       year: transaction.date.getFullYear(),
@@ -249,8 +258,16 @@ export class TransactionsPage {
       throw new Error(`Transaction row no longer matches: ${transaction.rowText}`);
     }
     await row.click();
+    const reason = await this.editButton.getAttribute("aria-description");
+    if (
+      (await this.editButton.isDisabled()) &&
+      reason === "Tranzacția are storno active; modifică sau șterge mai întâi stornourile."
+    ) {
+      return { status: "blocked", reason };
+    }
     await this.editButton.click();
     await expect(this.dialog).toBeVisible();
+    return { status: "opened" };
   }
 
   async getEInvoiceState(): Promise<"attached" | "available" | "unavailable"> {
@@ -266,12 +283,60 @@ export class TransactionsPage {
     await expect(this.dialog).toBeHidden();
   }
 
-  async attachEInvoice(file: { name: string; buffer: Buffer }) {
+  async getInvoiceSlots(): Promise<InvoiceSlot[]> {
+    // Linked attachment groups render only after the stored documents have loaded.
+    await expect(this.attachments.getByRole("group").first()).toBeVisible({ timeout: 30_000 });
+    const slots: InvoiceSlot[] = [];
+    for (const textbox of await this.dialog.getByRole("textbox", { name: /^Suma facturii \d+$/ }).all()) {
+      const label = await textbox.evaluate(
+        el => el.getAttribute("aria-label") ?? (el instanceof HTMLInputElement ? el.labels?.[0]?.textContent : null) ?? ""
+      );
+      const index = Number(label.match(/Suma facturii (\d+)/)?.[1]);
+      const raw = (await textbox.inputValue()).trim();
+      const amount = this.parseAmount(raw);
+      if (!Number.isInteger(index) || Number.isNaN(amount)) {
+        throw new Error(`Cannot read invoice slot "${label}" with amount "${raw}"`);
+      }
+      slots.push({
+        index,
+        amount,
+        eInvoiceStored:
+          (await this.attachments
+            .getByRole("list", { name: `eFactură ${index}`, exact: true })
+            .getByRole("listitem")
+            .count()) > 0,
+        eInvoiceUploadable: (await this.attachments.getByLabel(`Fișier: eFactură ${index}`, { exact: true }).count()) > 0
+      });
+    }
+    return slots;
+  }
+
+  private parseAmount(raw: string) {
+    let text = raw.replace(/[^\d.,-]/g, "");
+    if (!text) return Number.NaN;
+    if (text.lastIndexOf(",") > text.lastIndexOf(".")) {
+      text = text.replace(/\./g, "").replace(",", ".");
+    } else {
+      text = text.replace(/,/g, "");
+      if (text.split(".").length > 2) text = text.replace(/\./g, "");
+    }
+    return Number(text);
+  }
+
+  private async uploadEInvoice(file: { name: string; buffer: Buffer }, slot?: number) {
+    const input =
+      slot === undefined
+        ? this.eInvoiceInput
+        : this.attachments.getByLabel(`Fișier: eFactură ${slot}`, { exact: true });
+    const list =
+      slot === undefined
+        ? this.eInvoiceList
+        : this.attachments.getByRole("list", { name: `eFactură ${slot}`, exact: true });
     const uploaded = this.page.waitForResponse(
       response => new URL(response.url()).pathname.endsWith("/documents") && response.request().method() === "POST",
       { timeout: 60_000 }
     );
-    await this.eInvoiceInput.setInputFiles({ name: file.name, mimeType: "application/pdf", buffer: file.buffer });
+    await input.setInputFiles({ name: file.name, mimeType: "application/pdf", buffer: file.buffer });
     const response = await uploaded;
     expect(response.ok(), `Uploading Oblio PDF ${file.name}: HTTP ${response.status()}`).toBeTruthy();
     const document: unknown = await response.json();
@@ -287,10 +352,28 @@ export class TransactionsPage {
       throw new Error(`Unexpected eFactura upload response for ${file.name}`);
     }
     // Caserie assigns its own filename; wait for that document, not the selected filename.
-    await expect(this.eInvoiceList.getByRole("listitem").getByText(document.storedFileName, { exact: true })).toBeVisible({
+    await expect(list.getByRole("listitem").getByText(document.storedFileName, { exact: true })).toBeVisible({
       timeout: 60_000
     });
+  }
+
+  private async saveEdit() {
     await this.saveButton.click();
     await expect(this.dialog).toBeHidden({ timeout: 60_000 });
+  }
+
+  async attachEInvoice(file: { name: string; buffer: Buffer }) {
+    await this.uploadEInvoice(file);
+    await this.saveEdit();
+  }
+
+  async attachEInvoices(files: { slot: number; file: { name: string; buffer: Buffer } }[]) {
+    if (!files.length) {
+      throw new Error("Cannot save eFacturi when no invoice files were provided.");
+    }
+    for (const { slot, file } of files) {
+      await this.uploadEInvoice(file, slot);
+    }
+    await this.saveEdit();
   }
 }

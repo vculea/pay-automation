@@ -67,9 +67,14 @@ npx playwright test oblio.spec.ts --project=caserie --workers=1 --retries=0
 
 This test attaches PDFs to matching expense transactions. Exact amounts take
 priority; amounts sharing the first decimal digit are also considered, with a
-warning in the console and test report. Transactions marked "Da" in the grid's
-eFactura column are skipped without opening the edit dialog or downloading a PDF.
-For other transactions the dialog is checked again, detecting existing eFactura
+warning in the console and test report. Only transactions marked "Nu" in the grid's
+eFactura column are checked; "Da" and the dash status are skipped before matching
+Oblio documents, opening the edit dialog or downloading a PDF.
+Transactions whose Edit button is disabled because of active storno records are
+skipped with a warning; no storno records are changed or deleted, and candidate
+invoices remain available for other transactions. Other edit failures still fail
+the test.
+For eligible transactions the dialog is checked again, detecting existing eFactura
 documents even under "Alte documente atasate". If the dialog does not offer an eFactura
 upload zone (for example, special donations or commissions), the transaction is
 skipped with a warning and its candidate invoice remains available for other
